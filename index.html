@@ -184,6 +184,12 @@
             font-size: 0.875rem;
             font-style: italic;
         }
+        .more-images-text {
+            color: #6b7280;
+            font-size: 0.75rem;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
         .initial-prompt {
             text-align: center;
             color: #9ca3af;
@@ -305,6 +311,14 @@
     </div>
 
     <script>
+        // --- Configuration ---
+        const CONFIG = {
+            REQUEST_DELAY_MS: 200,      // Delay between requests
+            REQUEST_TIMEOUT_MS: 15000,  // Timeout for each request
+            MAX_RETRIES: 2,             // Retries per proxy
+            MAX_IMAGES_DISPLAY: 20      // Max images to show per product
+        };
+
         // --- DOM Elements ---
         const fileInput = document.getElementById('fileInput');
         const extractButton = document.getElementById('extractButton');
@@ -349,18 +363,51 @@
         }
 
         /**
+         * Validates if a string is a valid HTTP/HTTPS URL
+         */
+        function isValidUrl(string) {
+            if (!string || typeof string !== 'string') return false;
+            try {
+                const url = new URL(string);
+                // Only allow http and https protocols
+                if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+                    return false;
+                }
+                // Ensure hostname exists and is not empty
+                if (!url.hostname || url.hostname.length === 0) {
+                    return false;
+                }
+                // Block localhost and private IPs for security
+                const hostname = url.hostname.toLowerCase();
+                if (hostname === 'localhost' || 
+                    hostname.startsWith('127.') || 
+                    hostname.startsWith('192.168.') ||
+                    hostname.startsWith('10.') ||
+                    hostname.startsWith('172.16.') ||
+                    hostname === '[::1]') {
+                    return false;
+                }
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        /**
          * Fetches a URL using multiple CORS proxies with fallback
          */
-        async function fetchWithProxy(targetUrl, retries = 2) {
+        async function fetchWithProxy(targetUrl) {
             let lastError;
+            let totalAttempts = 0;
             
             for (const proxyFn of CORS_PROXIES) {
                 const proxyUrl = proxyFn(targetUrl);
                 
-                for (let attempt = 0; attempt < retries; attempt++) {
+                for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
+                    totalAttempts++;
                     try {
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 15000);
+                        const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT_MS);
                         
                         const response = await fetch(proxyUrl, {
                             method: 'GET',
@@ -384,14 +431,14 @@
                     } catch (e) {
                         lastError = e;
                         console.warn(`Proxy attempt failed for ${targetUrl}:`, e.message);
-                        if (attempt < retries - 1) {
+                        if (attempt < CONFIG.MAX_RETRIES - 1) {
                             await sleep(500);
                         }
                     }
                 }
             }
             
-            throw lastError || new Error('All proxies failed');
+            throw lastError || new Error(`Failed to fetch ${targetUrl} after ${totalAttempts} attempts across ${CORS_PROXIES.length} proxies`);
         }
 
         // --- CSV Processing ---
@@ -501,7 +548,7 @@
 
                         // Check if it's a valid image URL
                         const lowerUrl = absoluteUrl.toLowerCase();
-                        const hasImageExt = /\.(jpg|jpeg|png|webp|gif|avif|bmp|tiff?)(\?.*)?$/i.test(lowerUrl);
+                        const hasImageExt = /\.(jpe?g|png|webp|gif|avif|bmp|tiff?)(\?.*)?$/i.test(lowerUrl);
                         const isImagePath = /\/images?\//i.test(lowerUrl) || /\/photos?\//i.test(lowerUrl) || /\/products?\//i.test(lowerUrl);
                         
                         // Exclude common non-product images
@@ -590,8 +637,8 @@
             gallery.className = 'image-gallery';
 
             if (imageUrls.length > 0) {
-                // Limit to first 20 images to avoid overwhelming the UI
-                const displayImages = imageUrls.slice(0, 20);
+                // Limit displayed images to avoid overwhelming the UI
+                const displayImages = imageUrls.slice(0, CONFIG.MAX_IMAGES_DISPLAY);
                 displayImages.forEach(imageUrl => {
                     const thumb = document.createElement('div');
                     thumb.className = 'image-thumb';
@@ -617,10 +664,10 @@
                     gallery.appendChild(thumb);
                 });
 
-                if (imageUrls.length > 20) {
+                if (imageUrls.length > CONFIG.MAX_IMAGES_DISPLAY) {
                     const moreText = document.createElement('p');
-                    moreText.style.cssText = 'color:#6b7280;font-size:0.75rem;width:100%;margin-top:0.5rem;';
-                    moreText.textContent = `+ ${imageUrls.length - 20} more images`;
+                    moreText.className = 'more-images-text';
+                    moreText.textContent = `+ ${imageUrls.length - CONFIG.MAX_IMAGES_DISPLAY} more images`;
                     gallery.appendChild(moreText);
                 }
             } else {
@@ -660,7 +707,7 @@
                 statusMessage.className = 'status';
                 updateProgress(i + 1, totalProducts);
 
-                if (!url || !/^https?:\/\//i.test(url)) {
+                if (!isValidUrl(url)) {
                     errorCount++;
                     renderResult(name, [], '', 'error');
                     continue;
@@ -685,7 +732,7 @@
                 renderResult(name, imageUrls, url, status);
 
                 // Small delay between requests to be polite
-                await sleep(200);
+                await sleep(CONFIG.REQUEST_DELAY_MS);
             }
 
             progressContainer.style.display = 'none';
@@ -722,7 +769,7 @@
                     csvData = parsed
                         .filter(item => {
                             const url = item.vendor_product_url || item.url || item.link || item.product_url || item.webpage;
-                            return url && /^https?:\/\//i.test(url);
+                            return isValidUrl(url);
                         })
                         .map(item => ({
                             name: item.name || item.product_name || item.title || item.product || '',
