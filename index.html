@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Image Gallery Extractor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: white;
+        }
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+        .card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            background: #f9fafb;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        input[type="file"]:hover {
+            border-color: #6366f1;
+            background: #eef2ff;
+        }
+        .btn {
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.875rem 1.5rem;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: #f3f4f6;
+            border-radius: 8px;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .results {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .product-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #fafafa;
+        }
+        .product-card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 0.25rem;
+        }
+        .product-card a {
+            font-size: 0.75rem;
+            color: #6366f1;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .product-card a:hover {
+            text-decoration: underline;
+        }
+        .image-count {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin: 0.75rem 0 0.5rem;
+        }
+        .image-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .image-thumb {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            background: #e5e7eb;
+            cursor: pointer;
+        }
+        .image-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.2s;
+        }
+        .image-thumb:hover img {
+            opacity: 0.7;
+        }
+        .image-thumb .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            color: white;
+            font-size: 0.625rem;
+            text-align: center;
+            padding: 0.25rem;
+        }
+        .image-thumb:hover .overlay {
+            opacity: 1;
+        }
+        .no-images {
+            color: #9ca3af;
+            font-size: 0.875rem;
+            font-style: italic;
+        }
+        .initial-prompt {
+            text-align: center;
+            color: #9ca3af;
+            padding: 3rem 1rem;
+        }
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #e5e7eb;
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            z-index: 1000;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #dc2626;
+            margin-bottom: 1rem;
+        }
+        .modal-content p {
+            color: #4b5563;
+            margin-bottom: 1.5rem;
+        }
+        .modal-content button {
+            padding: 0.5rem 1.5rem;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .modal-content button:hover {
+            background: #b91c1c;
+        }
+        .progress-bar {
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖼️ Product Image Gallery Extractor</h1>
+            <p>Upload a CSV with product names and URLs to extract all images from vendor pages</p>
+        </header>
+
+        <div class="card">
+            <label for="fileInput">
+                Select CSV File (must have "name" and "url" columns)
+            </label>
+            <input type="file" id="fileInput" accept=".csv" />
+            <button id="extractButton" class="btn" disabled>
+                <span id="buttonContent">Start Extraction</span>
+            </button>
+        </div>
+
+        <div class="card">
+            <h2>📊 Extraction Results</h2>
+            <div id="statusMessage" class="status">Waiting for file upload...</div>
+            <div id="progressContainer" style="display: none;">
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress-bar-fill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div id="resultsContainer" class="results">
+                <p id="initialPrompt" class="initial-prompt">
+                    Results will appear here after extraction is complete.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modalTitle">Error</h3>
+            <p id="errorText"></p>
+            <button onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const fileInput = document.getElementById('fileInput');
+        const extractButton = document.getElementById('extractButton');
+        const statusMessage = document.getElementById('statusMessage');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const initialPrompt = document.getElementById('initialPrompt');
+        const buttonContent = document.getElementById('buttonContent');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+
+        // Global variable for the parsed CSV data
+        let csvData = [];
+
+        // --- CORS Proxies (fallback chain) ---
+        const CORS_PROXIES = [
+            url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+            url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+        ];
+
+        // --- Utility Functions ---
+
+        function closeModal() {
+            document.getElementById('errorModal').classList.remove('show');
+        }
+
+        function showMessage(title, message, isError = true) {
+            const modal = document.getElementById('errorModal');
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalTitle').style.color = isError ? '#dc2626' : '#2563eb';
+            modal.classList.add('show');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function updateProgress(current, total) {
+            const percent = Math.round((current / total) * 100);
+            progressBar.style.width = `${percent}%`;
+        }
+
+        /**
+         * Fetches a URL using multiple CORS proxies with fallback
+         */
+        async function fetchWithProxy(targetUrl, retries = 2) {
+            let lastError;
+            
+            for (const proxyFn of CORS_PROXIES) {
+                const proxyUrl = proxyFn(targetUrl);
+                
+                for (let attempt = 0; attempt < retries; attempt++) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 15000);
+                        
+                        const response = await fetch(proxyUrl, {
+                            method: 'GET',
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        if (response.ok) {
+                            return await response.text();
+                        }
+                        
+                        if (response.status === 429) {
+                            const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                            console.warn(`Rate limit hit. Waiting ${Math.round(delay/1000)}s...`);
+                            await sleep(delay);
+                            continue;
+                        }
+                        
+                        throw new Error(`HTTP ${response.status}`);
+                    } catch (e) {
+                        lastError = e;
+                        console.warn(`Proxy attempt failed for ${targetUrl}:`, e.message);
+                        if (attempt < retries - 1) {
+                            await sleep(500);
+                        }
+                    }
+                }
+            }
+            
+            throw lastError || new Error('All proxies failed');
+        }
+
+        // --- CSV Processing ---
+
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split(/\r?\n/);
+            if (lines.length === 0) return [];
+
+            // Parse header row - handle quoted headers
+            const headerLine = lines[0];
+            const headers = [];
+            let inQuote = false;
+            let currentHeader = '';
+            
+            for (let i = 0; i < headerLine.length; i++) {
+                const char = headerLine[i];
+                if (char === '"') {
+                    inQuote = !inQuote;
+                } else if (char === ',' && !inQuote) {
+                    headers.push(currentHeader.trim().replace(/^"|"$/g, '').toLowerCase());
+                    currentHeader = '';
+                } else {
+                    currentHeader += char;
+                }
+            }
+            headers.push(currentHeader.trim().replace(/^"|"$/g, '').toLowerCase());
+
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                // Parse row with proper quote handling
+                const values = [];
+                inQuote = false;
+                let currentValue = '';
+                
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    if (char === '"') {
+                        inQuote = !inQuote;
+                    } else if (char === ',' && !inQuote) {
+                        values.push(currentValue.trim().replace(/^"|"$/g, ''));
+                        currentValue = '';
+                    } else {
+                        currentValue += char;
+                    }
+                }
+                values.push(currentValue.trim().replace(/^"|"$/g, ''));
+
+                const obj = {};
+                headers.forEach((header, index) => {
+                    if (values[index] !== undefined) {
+                        obj[header] = values[index];
+                    }
+                });
+
+                data.push(obj);
+            }
+
+            return data;
+        }
+
+        // --- Image Extraction ---
+
+        function extractImageUrls(htmlContent, baseUrl) {
+            const imageUrls = new Set();
+
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+
+                // Get all images from the document
+                const imgElements = doc.querySelectorAll('img');
+
+                imgElements.forEach(img => {
+                    // Check multiple possible image source attributes
+                    const sources = [
+                        img.getAttribute('src'),
+                        img.getAttribute('data-src'),
+                        img.getAttribute('data-lazy-src'),
+                        img.getAttribute('data-original'),
+                        img.getAttribute('data-zoom-image'),
+                        img.getAttribute('data-large-image')
+                    ];
+
+                    // Also check srcset
+                    const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+                    if (srcset) {
+                        // Extract URLs from srcset (format: "url 1x, url 2x" or "url 100w")
+                        srcset.split(',').forEach(part => {
+                            const url = part.trim().split(/\s+/)[0];
+                            if (url) sources.push(url);
+                        });
+                    }
+
+                    sources.forEach(src => {
+                        if (!src || src.startsWith('data:')) return;
+
+                        let absoluteUrl;
+                        try {
+                            absoluteUrl = new URL(src, baseUrl).href;
+                        } catch (e) {
+                            return;
+                        }
+
+                        // Check if it's a valid image URL
+                        const lowerUrl = absoluteUrl.toLowerCase();
+                        const hasImageExt = /\.(jpg|jpeg|png|webp|gif|avif|bmp|tiff?)(\?.*)?$/i.test(lowerUrl);
+                        const isImagePath = /\/images?\//i.test(lowerUrl) || /\/photos?\//i.test(lowerUrl) || /\/products?\//i.test(lowerUrl);
+                        
+                        // Exclude common non-product images
+                        const isExcluded = 
+                            lowerUrl.includes('placeholder') ||
+                            lowerUrl.includes('spinner') ||
+                            lowerUrl.includes('loading') ||
+                            lowerUrl.includes('sprite') ||
+                            lowerUrl.includes('/icon') ||
+                            lowerUrl.includes('/logo') ||
+                            lowerUrl.includes('/banner') ||
+                            lowerUrl.includes('/footer') ||
+                            lowerUrl.includes('/header') ||
+                            lowerUrl.includes('1x1') ||
+                            lowerUrl.includes('pixel') ||
+                            lowerUrl.includes('tracking') ||
+                            lowerUrl.includes('analytics') ||
+                            lowerUrl.includes('badge') ||
+                            lowerUrl.includes('/payment') ||
+                            lowerUrl.includes('/social');
+
+                        if ((hasImageExt || isImagePath) && !isExcluded && absoluteUrl.length > 10) {
+                            imageUrls.add(absoluteUrl);
+                        }
+                    });
+                });
+
+                // Also look for background images in style attributes
+                const elementsWithStyle = doc.querySelectorAll('[style*="background"]');
+                elementsWithStyle.forEach(el => {
+                    const style = el.getAttribute('style') || '';
+                    const matches = style.match(/url\(['"]?([^'")\s]+)['"]?\)/gi);
+                    if (matches) {
+                        matches.forEach(match => {
+                            const url = match.replace(/url\(['"]?|['"]?\)/gi, '');
+                            if (url && !url.startsWith('data:')) {
+                                try {
+                                    const absoluteUrl = new URL(url, baseUrl).href;
+                                    if (/\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(absoluteUrl)) {
+                                        imageUrls.add(absoluteUrl);
+                                    }
+                                } catch (e) {}
+                            }
+                        });
+                    }
+                });
+
+            } catch (e) {
+                console.error('Error during image extraction:', e);
+            }
+
+            return Array.from(imageUrls);
+        }
+
+        // --- Result Rendering ---
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderResult(productName, imageUrls, productUrl, status = 'success') {
+            const card = document.createElement('div');
+            card.className = 'product-card';
+
+            const safeName = escapeHtml(productName || '(No name)');
+            const safeUrl = productUrl && /^https?:\/\//i.test(productUrl) ? productUrl : '';
+
+            let statusBadge = '';
+            if (status === 'error') {
+                statusBadge = '<span style="color:#dc2626;font-size:0.75rem;margin-left:0.5rem;">⚠️ Fetch failed</span>';
+            } else if (imageUrls.length === 0) {
+                statusBadge = '<span style="color:#f59e0b;font-size:0.75rem;margin-left:0.5rem;">No images found</span>';
+            }
+
+            card.innerHTML = `
+                <h3>${safeName}${statusBadge}</h3>
+                ${safeUrl 
+                    ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(safeUrl)}</a>` 
+                    : '<span style="color:#9ca3af;font-size:0.75rem;">No valid URL</span>'}
+                <p class="image-count">${imageUrls.length} image(s) found</p>
+            `;
+
+            const gallery = document.createElement('div');
+            gallery.className = 'image-gallery';
+
+            if (imageUrls.length > 0) {
+                // Limit to first 20 images to avoid overwhelming the UI
+                const displayImages = imageUrls.slice(0, 20);
+                displayImages.forEach(imageUrl => {
+                    const thumb = document.createElement('div');
+                    thumb.className = 'image-thumb';
+
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.alt = `Image for ${safeName}`;
+                    img.loading = 'lazy';
+                    img.onerror = () => {
+                        img.onerror = null;
+                        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect fill="%23fee2e2" width="80" height="80"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23dc2626" font-size="10"%3EError%3C/text%3E%3C/svg%3E';
+                    };
+
+                    const overlay = document.createElement('a');
+                    overlay.href = imageUrl;
+                    overlay.target = '_blank';
+                    overlay.rel = 'noopener noreferrer';
+                    overlay.className = 'overlay';
+                    overlay.textContent = 'View';
+
+                    thumb.appendChild(img);
+                    thumb.appendChild(overlay);
+                    gallery.appendChild(thumb);
+                });
+
+                if (imageUrls.length > 20) {
+                    const moreText = document.createElement('p');
+                    moreText.style.cssText = 'color:#6b7280;font-size:0.75rem;width:100%;margin-top:0.5rem;';
+                    moreText.textContent = `+ ${imageUrls.length - 20} more images`;
+                    gallery.appendChild(moreText);
+                }
+            } else {
+                gallery.innerHTML = '<p class="no-images">No qualifying images were found on this page.</p>';
+            }
+
+            card.appendChild(gallery);
+            resultsContainer.appendChild(card);
+        }
+
+        // --- Main Extraction ---
+
+        async function startExtraction() {
+            if (!csvData || csvData.length === 0) {
+                showMessage('No Data', 'Please upload a valid CSV file first.');
+                return;
+            }
+
+            resultsContainer.innerHTML = '';
+            initialPrompt.style.display = 'none';
+            progressContainer.style.display = 'block';
+            updateProgress(0, csvData.length);
+
+            const totalProducts = csvData.length;
+            let foundCount = 0;
+            let errorCount = 0;
+
+            extractButton.disabled = true;
+            buttonContent.innerHTML = '<span class="spinner"></span> Extracting...';
+
+            for (let i = 0; i < totalProducts; i++) {
+                const product = csvData[i];
+                const name = product.name || `Product ${i + 1}`;
+                const url = product.url;
+
+                statusMessage.textContent = `Processing "${name}" (${i + 1} of ${totalProducts})...`;
+                statusMessage.className = 'status';
+                updateProgress(i + 1, totalProducts);
+
+                if (!url || !/^https?:\/\//i.test(url)) {
+                    errorCount++;
+                    renderResult(name, [], '', 'error');
+                    continue;
+                }
+
+                let imageUrls = [];
+                let status = 'success';
+                
+                try {
+                    const htmlContent = await fetchWithProxy(url);
+                    imageUrls = extractImageUrls(htmlContent, url);
+                    
+                    if (imageUrls.length > 0) {
+                        foundCount++;
+                    }
+                } catch (error) {
+                    console.error(`Failed to fetch ${name} (${url}):`, error);
+                    errorCount++;
+                    status = 'error';
+                }
+
+                renderResult(name, imageUrls, url, status);
+
+                // Small delay between requests to be polite
+                await sleep(200);
+            }
+
+            progressContainer.style.display = 'none';
+            statusMessage.innerHTML = `
+                <strong>✅ Extraction Complete!</strong><br>
+                Processed: ${totalProducts} products | 
+                Found images: ${foundCount} | 
+                Errors/No images: ${errorCount}
+            `;
+            statusMessage.className = 'status success';
+
+            extractButton.disabled = false;
+            buttonContent.textContent = 'Start Extraction';
+        }
+
+        // --- Event Listeners ---
+
+        fileInput.addEventListener('change', event => {
+            const file = event.target.files[0];
+            if (!file) {
+                extractButton.disabled = true;
+                statusMessage.textContent = 'Waiting for file upload...';
+                statusMessage.className = 'status';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const text = e.target.result;
+                    const parsed = parseCSV(text);
+
+                    // Find URL column (support multiple naming conventions)
+                    csvData = parsed
+                        .filter(item => {
+                            const url = item.vendor_product_url || item.url || item.link || item.product_url || item.webpage;
+                            return url && /^https?:\/\//i.test(url);
+                        })
+                        .map(item => ({
+                            name: item.name || item.product_name || item.title || item.product || '',
+                            url: item.vendor_product_url || item.url || item.link || item.product_url || item.webpage
+                        }));
+
+                    if (csvData.length === 0) {
+                        showMessage(
+                            'No Valid Products Found',
+                            'Your CSV must have a "name" column and a URL column (e.g., "url", "link", or "vendor_product_url") with valid http/https URLs.'
+                        );
+                        extractButton.disabled = true;
+                        statusMessage.textContent = 'Please upload a valid CSV file.';
+                        statusMessage.className = 'status error';
+                    } else {
+                        statusMessage.textContent = `✓ Loaded ${csvData.length} products from CSV. Ready to extract!`;
+                        statusMessage.className = 'status success';
+                        extractButton.disabled = false;
+                        resultsContainer.innerHTML = '';
+                        initialPrompt.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error(error);
+                    showMessage('File Error', `Failed to parse CSV: ${error.message}`);
+                    extractButton.disabled = true;
+                    statusMessage.textContent = 'Error reading file.';
+                    statusMessage.className = 'status error';
+                }
+            };
+
+            reader.onerror = () => {
+                showMessage('File Error', 'Could not read the file.');
+                extractButton.disabled = true;
+            };
+
+            reader.readAsText(file);
+        });
+
+        extractButton.addEventListener('click', startExtraction);
+
+        // Initialize
+        extractButton.disabled = true;
+    </script>
+</body>
+</html>
